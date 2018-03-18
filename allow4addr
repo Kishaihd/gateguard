@@ -1,0 +1,14 @@
+#!/bin/bash
+#Allow a specific ipv4 aaddress
+
+if [[ $1 != "" && $1 != " " ]]; then
+	#At this point, iptables was already saved to /tmp/house4rules
+		sudo iptables -A INPUT -s $1 -j ACCEPT
+		sudo iptables -A OUTPUT -s $1 -j ACCEPT
+	if [[ ! -e /tmp/house4rules ]]; then
+		echo "No existing rules detected, starting new list!"
+	fi
+else 
+	echo "No ipv4 address specififed! (allow4addr)"
+fi
+

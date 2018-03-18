@@ -1,0 +1,16 @@
+#!/bin/bash
+#Block a specific ipv4 aaddress
+
+if [[ $1 != "" && $1 != " " ]]; then
+	#At this point, iptables was already saved to /tmp/house4Rules
+	sudo iptables -I INPUT -s $1 -j DROP
+	sudo iptables -I OUTPUT -s $1 -j DROP
+	if [[ ! -e /tmp/house4rules ]]; then
+		echo "No existing rules detected, starting new list!"
+	fi
+else 
+	echo "No ipv4 address specififed! (block4addr)"
+fi
+
+
+

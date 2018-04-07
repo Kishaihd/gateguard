@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# +++ Add a command to close all ports? -- could be dangerous if not physically on machine. 
+# +++ Add a command to drop all packets not from local machine as well as you (in case you're remote)
+
 # Tool to automate a lot of the iptables setup
 # Has the ability to allow/block specific ip addresses, or entire ip subnets (Both ipv4 and ipv6)
 # Can also allow/block protocols such as ssh, http, https, pop3, mysql, and more!
@@ -10,23 +13,247 @@ print_help() {
 	echo " "
 	echo "gateguard [ip4/ip6 address | ip4/ip6 unspecified subnet | protocol] <command>"
 	echo " "
+	echo "Protocol may be specified as one of: "
+	echo "< ssh | http | https | rsync | mysql | postgresql | smpt | imap | pop3 | pop3s >"
+	echo ""
 	echo "Where <command> is one of:"
 	echo "============================="
 	echo "short   long      description"
 	echo "============================="
-	echo "a	allow	  -allow ip or subnet"
-	echo "b	block	  -block ip or subnet"
-	echo "d	down	  -take down iptable rules, saving current configuration"
-	echo "u	up	  -restore iptable rules from previous configuration"
-	echo "f	flush	  -flush iptable rules without saving current configuration"
-	echo "r	remove	  -remove saved rules without dropping current tables"
-	echo "l	list	  -list current iptables rules"
+	echo "a	allow	  --allow ip or subnet"
+	echo "b	block	  --block ip or subnet"
+	echo "d	down	  --take down iptable rules, saving current configuration"
+	echo "u	up	  --restore iptable rules from previous configuration"
+	echo "f	flush	  --flush iptable rules without saving current configuration"
+	echo "r	remove	  --remove saved rules without dropping current tables"
+	echo "l	list	  --list current iptables rules"
 	#echo "i	interface -specify interface <ethernet|wifi|all> Default: all"
-	echo " "
-	echo "Protocol may be specified as one of: "
-	echo "<ssh | http | https | rsync | mysql | postgresql | smpt | imap | pop3 | pop3s>"
+	echo "	log	  --log all packets."
+	echo "		    can optionally specify log rule to be <first> or <last> in chain."
+	echo "	show logs --print the iptable logs. May also specify 'unique'"
+	echo "	restore	  --restore iptable rules from previous configuration;"
+	echo "		    can optionally specify <saved> settings or <previous> settings."
+	echo "		    <saved> settings are the most recently used."
+	echo "		    <previous> setting were prior to <saved> (i.e. \"rollback\")."
 	#echo "p	protocol  -specify protocol, one of:"
+	echo ""
+	echo "======= Advanced commands ======"
+	echo "lockdown [your ip]	--lockdown the machine to only allow your ip."
+	echo "			  if no ip is specified, it is assumed you are"
+	echo "			  on the physical machine. (Careful!)"
+	echo "closeports [except]	--Close all ports except for optional port specified."
 }
+
+config_ssh() {
+    port=22
+    if [[ $1 == "a" || $1 == "allow" ]]; then
+        sudo iptables -A INPUT -p tcp --dport $port -j ACCEPT
+        sudo iptables -A OUTPUT -p tcp --sport $port -j ACCEPT
+        sudo ip6tables -A INPUT -p tcp --dport $port -j ACCEPT
+        sudo ip6tables -A OUTPUT -p tcp --sport $port -j ACCEPT
+        echo "All ssh traffic on port $port allowed"
+    elif [[ $1 == "b" || $1 == "block" ]]; then
+        sudo iptables -I INPUT -p tcp --dport $port -j DROP
+        sudo iptables -I OUTPUT -p tcp --sport $port -j DROP
+        sudo ip6tables -I INPUT -p tcp --dport $port -j DROP
+        sudo ip6tables -I OUTPUT -p tcp --sport $port -j DROP
+        echo "All ssh traffic on port $port blocked"
+    else #if [[ $2 == "" || $2 == " " ]]; then
+        echo "No decision specified for ssh! <allow|block>"
+    fi
+}
+
+config_rsync() {
+    port=873
+    if [[ $1 == "a" || $1 == "allow" ]]; then
+        sudo iptables -A INPUT -p tcp --dport $port -j ACCEPT
+        sudo iptables -A OUTPUT -p tcp --sport $port -j ACCEPT
+        sudo ip6tables -A INPUT -p tcp --dport $port -j ACCEPT
+        sudo ip6tables -A OUTPUT -p tcp --sport $port -j ACCEPT
+        echo "All rsync traffic on port $port allowed"
+    elif [[ $1 == "b" || $1 == "block" ]]; then
+        sudo iptables -I INPUT -p tcp --dport $port -j DROP
+        sudo iptables -I OUTPUT -p tcp --sport $port -j DROP
+        sudo ip6tables -I INPUT -p tcp --dport $port -j DROP
+        sudo ip6tables -I OUTPUT -p tcp --sport $port -j DROP
+        echo "All rsync traffic on port $port blocked"
+    else #if [[ $2 == "" || $2 == " " ]]; then
+        echo "No decision specified for rsync! <allow|block>"
+    fi
+}
+
+config_http() {
+    port=80
+    if [[ $1 == "a" || $1 == "allow" ]]; then
+        sudo iptables -A INPUT -p tcp --dport $port -j ACCEPT
+        sudo iptables -A OUTPUT -p tcp --sport $port -j ACCEPT
+        sudo ip6tables -A INPUT -p tcp --dport $port -j ACCEPT
+        sudo ip6tables -A OUTPUT -p tcp --sport $port -j ACCEPT
+        echo "All $1 traffic on port $port allowed"
+    elif [[ $1 == "b" || $1 == "block" ]]; then
+        sudo iptables -I INPUT -p tcp --dport $port -j DROP
+        sudo iptables -I OUTPUT -p tcp --sport $port -j DROP
+        sudo ip6tables -I INPUT -p tcp --dport $port -j DROP
+        sudo ip6tables -I OUTPUT -p tcp --sport $port -j DROP
+        echo "All http traffic on port $port blocked"
+    else #if [[ $1 == "" || $1 == " " ]]; then
+        echo "No decision specified for http! <allow|block>"
+    fi
+}
+
+config_https() {
+    port=443
+    if [[ $1 == "a" || $1 == "allow" ]]; then
+        sudo iptables -A INPUT -p tcp --dport $port -j ACCEPT
+        sudo iptables -A OUTPUT -p tcp --sport $port -j ACCEPT
+        sudo ip6tables -A INPUT -p tcp --dport $port -j ACCEPT
+        sudo ip6tables -A OUTPUT -p tcp --sport $port -j ACCEPT
+        echo "All $1 traffic on port $port allowed"
+    elif [[ $1 == "b" || $1 == "block" ]]; then
+        sudo iptables -I INPUT -p tcp --dport $port -j DROP
+        sudo iptables -I OUTPUT -p tcp --sport $port -j DROP
+        sudo ip6tables -I INPUT -p tcp --dport $port -j DROP
+        sudo ip6tables -I OUTPUT -p tcp --sport $port -j DROP
+        echo "All https traffic on port $port blocked"
+    else #if [[ $2 == "" || $2 == " " ]]; then
+        echo "No decision specified for https! <allow|block>"
+    fi
+}
+
+
+config_mysql() {
+    port=3306
+    if [[ $1 == "a" || $1 == "allow" ]]; then
+        sudo iptables -A INPUT -p tcp --dport $port -j ACCEPT
+        sudo iptables -A OUTPUT -p tcp --sport $port -j ACCEPT
+        sudo ip6tables -A INPUT -p tcp --dport $port -j ACCEPT
+        sudo ip6tables -A OUTPUT -p tcp --sport $port -j ACCEPT
+        echo "All mysql traffic on port $port allowed"
+    elif [[ $1 == "b" || $1 == "block" ]]; then
+        sudo iptables -I INPUT -p tcp --dport $port -j DROP
+        sudo iptables -I OUTPUT -p tcp --sport $port -j DROP
+        sudo ip6tables -I INPUT -p tcp --dport $port -j DROP
+        sudo ip6tables -I OUTPUT -p tcp --sport $port -j DROP
+        echo "All mysql traffic on port $port blocked"
+    else #if [[ $2 == "" || $2 == " " ]]; then
+        echo "No decision specified for mysql! <allow|block>"
+    fi
+}
+
+config_postgresql() {
+    port=5432
+    if [[ $1 == "a" || $1 == "allow" ]]; then
+        sudo iptables -A INPUT -p tcp --dport $port -j ACCEPT
+        sudo iptables -A OUTPUT -p tcp --sport $port -j ACCEPT
+        sudo ip6tables -A INPUT -p tcp --dport $port -j ACCEPT
+        sudo ip6tables -A OUTPUT -p tcp --sport $port -j ACCEPT
+        echo "All postgresql traffic on port $port allowed"
+    elif [[ $2 == "b" || $2 == "block" ]]; then
+        sudo iptables -I INPUT -p tcp --dport $port -j DROP
+        sudo iptables -I OUTPUT -p tcp --sport $port -j DROP
+        sudo ip6tables -I INPUT -p tcp --dport $port -j DROP
+        sudo ip6tables -I OUTPUT -p tcp --sport $port -j DROP
+        echo "All $1 traffic on port $port blocked"
+    elif [[ $2 == "" || $2 == " " ]]; then
+        echo "No decision specified for $1! <allow|block>"
+    fi
+}
+
+config_smtp() {
+    port=25
+    if [[ $2 == "a" || $2 == "allow" ]]; then
+        sudo iptables -A INPUT -p tcp --dport $port -j ACCEPT
+        sudo iptables -A OUTPUT -p tcp --sport $port -j ACCEPT
+        sudo ip6tables -A INPUT -p tcp --dport $port -j ACCEPT
+        sudo ip6tables -A OUTPUT -p tcp --sport $port -j ACCEPT
+        echo "All $1 traffic on port $port allowed"
+    elif [[ $2 == "b" || $2 == "block" ]]; then
+        sudo iptables -I INPUT -p tcp --dport $port -j DROP
+        sudo iptables -I OUTPUT -p tcp --sport $port -j DROP
+        sudo ip6tables -I INPUT -p tcp --dport $port -j DROP
+        sudo ip6tables -I OUTPUT -p tcp --sport $port -j DROP
+        echo "All $1 traffic on port $port blocked"
+    elif [[ $2 == "" || $2 == " " ]]; then
+        echo "No decision specified for $1! <allow|block>"
+    fi
+}
+
+config_imap() {
+    port=143
+    if [[ $2 == "a" || $2 == "allow" ]]; then
+        sudo iptables -A INPUT -p tcp --dport $port -j ACCEPT
+        sudo iptables -A OUTPUT -p tcp --sport $port -j ACCEPT
+        sudo ip6tables -A INPUT -p tcp --dport $port -j ACCEPT
+        sudo ip6tables -A OUTPUT -p tcp --sport $port -j ACCEPT
+        echo "All $1 traffic on port $port allowed"
+    elif [[ $2 == "b" || $2 == "block" ]]; then
+        sudo iptables -I INPUT -p tcp --dport $port -j DROP
+        sudo iptables -I OUTPUT -p tcp --sport $port -j DROP
+        sudo ip6tables -I INPUT -p tcp --dport $port -j DROP
+        sudo ip6tables -I OUTPUT -p tcp --sport $port -j DROP
+        echo "All $1 traffic on port $port blocked"
+    elif [[ $2 == "" || $2 == " " ]]; then
+        echo "No decision specified for $1! <allow|block>"
+    fi
+}
+
+config_imaps() {
+    port=993
+    if [[ $2 == "a" || $2 == "allow" ]]; then
+        sudo iptables -A INPUT -p tcp --dport $port -j ACCEPT
+        sudo iptables -A OUTPUT -p tcp --sport $port -j ACCEPT
+        sudo ip6tables -A INPUT -p tcp --dport $port -j ACCEPT
+        sudo ip6tables -A OUTPUT -p tcp --sport $port -j ACCEPT
+        echo "All $1 traffic on port $port allowed"
+    elif [[ $2 == "b" || $2 == "block" ]]; then
+        sudo iptables -I INPUT -p tcp --dport $port -j DROP
+        sudo iptables -I OUTPUT -p tcp --sport $port -j DROP
+        sudo ip6tables -I INPUT -p tcp --dport $port -j DROP
+        sudo ip6tables -I OUTPUT -p tcp --sport $port -j DROP
+        echo "All $1 traffic on port $port blocked"
+    elif [[ $2 == "" || $2 == " " ]]; then
+        echo "No decision specified for $1! <allow|block>"
+    fi
+}
+
+config_pop3() {
+    port=110
+    if [[ $2 == "a" || $2 == "allow" ]]; then
+        sudo iptables -A INPUT -p tcp --dport $port -j ACCEPT
+        sudo iptables -A OUTPUT -p tcp --sport $port -j ACCEPT
+        sudo ip6tables -A INPUT -p tcp --dport $port -j ACCEPT
+        sudo ip6tables -A OUTPUT -p tcp --sport $port -j ACCEPT
+        echo "All $1 traffic on port $port allowed"
+    elif [[ $2 == "b" || $2 == "block" ]]; then
+        sudo iptables -I INPUT -p tcp --dport $port -j DROP
+        sudo iptables -I OUTPUT -p tcp --sport $port -j DROP
+        sudo ip6tables -I INPUT -p tcp --dport $port -j DROP
+        sudo ip6tables -I OUTPUT -p tcp --sport $port -j DROP
+        echo "All $1 traffic on port $port blocked"
+    elif [[ $2 == "" || $2 == " " ]]; then
+        echo "No decision specified for $1! <allow|block>"
+    fi
+}
+
+config_pop3s() {
+    port=995
+    if [[ $2 == "a" || $2 == "allow" ]]; then
+        sudo iptables -A INPUT -p tcp --dport $port -j ACCEPT
+        sudo iptables -A OUTPUT -p tcp --sport $port -j ACCEPT
+        sudo ip6tables -A INPUT -p tcp --dport $port -j ACCEPT
+        sudo ip6tables -A OUTPUT -p tcp --sport $port -j ACCEPT
+        echo "All $1 traffic on port $port allowed"
+    elif [[ $2 == "b" || $2 == "block" ]]; then
+        sudo iptables -I INPUT -p tcp --dport $port -j DROP
+        sudo iptables -I OUTPUT -p tcp --sport $port -j DROP
+        sudo ip6tables -I INPUT -p tcp --dport $port -j DROP
+        sudo ip6tables -I OUTPUT -p tcp --sport $port -j DROP
+        echo "All $1 traffic on port $port blocked"
+    elif [[ $2 == "" || $2 == " " ]]; then
+        echo "No decision specified for $1! <allow|block>"
+    fi
+}
+
 
 save() {
 	sudo iptables-save > /tmp/house4rules
@@ -35,17 +262,33 @@ save() {
 }
 
 restore() {
-	if [[ -e /tmp/house4rules ]]; then
-		sudo iptables-restore < /tmp/house4rules
-		echo "--- ipv4 tables up"
-	else
-		echo "!!! No ipv4 table definitions found !!!"
-	fi
-	if [[ -e /tmp/house6rules ]]; then
-		sudo ip6tables-restore < /tmp/house6rules
-		echo "--- ipv6 tables up"
-	else
-		echo "!!! No ipv6 table definitions found !!!"
+	#Can optionally restore to settings you had prior to current settings.
+	if [[ $1 == "saved" ]]; then
+		if [[ -e /tmp/house4rules ]]; then
+			sudo iptables-restore < /tmp/house4rules
+			echo "--- ipv4 tables up"
+		else
+			echo "!!! No ipv4 table definitions found !!!"
+		fi
+		if [[ -e /tmp/house6rules ]]; then
+			sudo ip6tables-restore < /tmp/house6rules
+			echo "--- ipv6 tables up"
+		else
+			echo "!!! No ipv6 table definitions found !!!"
+		fi
+	elif [[ $1 == "previous" ]]; then
+		if [[ -e /tmp/house4rules_previous ]]; then
+			sudo iptables-restore < /tmp/house4rules_previous
+			echo "--- ipv4 tables rolled back to previous configuration!"
+		else
+			echo "No prior configurations found (this is normal)"
+		fi
+		if [[ -e /tmp/house6rules_previous ]]; then
+			sudo ip6tables-restore < /tmp/house6rules_previous
+			echo "--- ipv6 tables rolled back to previous configuration!"
+		else
+			echo "No prior ipv6 configurations found (this is normal)"
+		fi
 	fi
 }
 
@@ -57,6 +300,7 @@ flush() {
 
 remove() {
 	if [[ -e /tmp/house4rules ]]; then
+		sudo iptables-save > /tmp/house4rules_previous
 		sudo rm /tmp/house4rules
 		r4="ipv4"
 	else
@@ -64,6 +308,7 @@ remove() {
 		r4=""
 	fi
 	if [[ -e /tmp/house6rules ]]; then
+		sudo iptables-save >/tmp/house6rules_previous
 		sudo rm /tmp/house6rules
 		r6="ipv6"
 	else
@@ -79,10 +324,76 @@ remove() {
 }
 
 list() {
-	echo "============== ipv4 rules =============="
+	# Only using sudo in the first command so that it doesn't 
+	# print the first command then ask for password.
+	sudo echo "============== ipv4 rules =============="
 	sudo iptables -L -v --line-numbers
 	echo "============== ipv6 rules =============="
 	sudo ip6tables -L -v --line-numbers
+}
+
+log_it() {
+	echo "Logging all incoming traffic"
+	echo "Use \"journalctl -k | grep \"IN=.*OUT=.*\""
+	echo "Or \"gateguard show logs [unique]\""
+	if [[ $1 == 'last' ]]; then
+		sudo iptables -A INPUT -j LOG
+		sudo ip6tables -A INPUT -j LOG
+	elif [[ $1 == 'first' ]]; then
+		sudo iptables -I INPUT -j LOG
+		sudo ip6tables -I INPUT -j LOG
+	fi
+}
+
+show_logs() {
+	#journalctl -k | grep "IN=.*OUT=.*"
+	journalctl -k | grep "IN=.*OUT=.*" | grep -Ev 'IN=lo' | cut -d ' ' -f1-3,9-10,17-19 > /tmp/iplogs
+	sort -k 4 -r /tmp/iplogs | cut -d ' ' -f4-8 | awk '!seen[$0]++' > /tmp/iplogs_unique
+	if [[ $1 == 'all' ]]; then
+		cat /tmp/iplogs
+		echo "====== To see only unique fields use 'show logs unique' ======"
+	elif [[ $1 == 'unique' ]]; then
+		#cat /tmp/iplogs | cut -d ' ' -f4-8 | sort -k 4 | awk '!seen[$0]++' > /tmp/iplogs_unique
+		cat /tmp/iplogs_unique
+	fi
+}
+
+lockdown() {
+	#Optionally supplied ip address (for remote user)
+	#if [[ $1 != "" && $1 != " " ]]; then
+	sudo iptables-save > /tmp/house4rules_previous
+        sudo ip6tables-save > /tmp/house6rules_previous
+    	sudo iptables -F
+    	sudo ip6tables -F
+	if [[ $1 =~ [0-9][0-9][0-9]?.[0-9][0-9]?[0-9]?.[0-9][0-9]?[0-9]?.[0-9][0-9]?[0-9]? ]]; then
+		sudo iptables -I INPUT -s $1 -j ACCEPT
+		sudo iptables -I OUTPUT -s $1 -j ACCEPT
+	elif [[ $1 =~ [0-9A-Fa-f]+[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]*:[0-9A-Fa-f]+[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]+[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]+[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]+[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]+[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]+[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]+[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]* ]]; then
+		sudo ip6tables -I INPUT -s $1 -j ACCEPT
+		sudo ip6tables -I OUTPUT -s $1 -j ACCEPT
+    	fi
+    	sudo iptables -I INPUT -s localhost -j ACCEPT
+    	sudo iptables -I OUTPUT -s localhost -j ACCEPT
+    	sudo ip6tables -I INPUT -s localhost -j ACCEPT
+    	sudo ip6tables -I OUTPUT -s localhost -j ACCEPT
+    	sudo iptables -P INPUT -j DROP
+    	sudo iptables -P OUTPUT -j DROP
+    	sudo ip6tables -P INPUT -j DROP
+    	sudo ip6tables -P OUTPUT -j DROP
+    	sudo iptables-save > /tmp/house4rules
+    	sudo ip6tables-save > /tmp/house6rules
+    	if [[ $1 != "" && $1 != " " ]]; then
+    	    optionalMsg="$1 and"
+    	else
+    	    optionalMsg=""
+    	fi
+    	echo "--- Default policy set to drop, allowing $optionalMsg localhost ---"
+}
+
+close_all_ports() {
+    	if [[ $1 != "" && $1 != " " ]]; then
+    	    echo "Diabettus"	
+    	fi
 }
 
 giveMeAccess() {
@@ -91,10 +402,10 @@ giveMeAccess() {
 	echo "Giving unrestricted access to $myIP"
 	if [[ $myIP =~ [0-9][0-9][0-9]?.[0-9][0-9]?[0-9]?.[0-9][0-9]?[0-9]?.[0-9][0-9]?[0-9]? ]]; then
 		sudo iptables -I INPUT -s $myIP -j ACCEPT
-        	sudo iptables -I OUTPUT -s $myIP -j ACCEPT
+    	   	sudo iptables -I OUTPUT -s $myIP -j ACCEPT
     	elif [[ $myIP =~ [0-9A-Fa-f]+[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]*:[0-9A-Fa-f]+[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]+[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]+[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]+[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]+[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]+[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]+[0-9A-Fa-f]*[0-9A-Fa-f]*[0-9A-Fa-f]* ]]; then
-        	sudo ip6tables -I INPUT -s $myIP -j ACCEPT
-        	sudo ip6tables -I OUTPUT -s $myIP -j ACCEPT
+       		sudo ip6tables -I INPUT -s $myIP -j ACCEPT
+       		sudo ip6tables -I OUTPUT -s $myIP -j ACCEPT
 	else
 		echo "No host ip address entered or formatting is incorrect!"
 	fi
@@ -104,7 +415,13 @@ giveMeAccess() {
 if [[ $1 == "-h" || $1 == "--help" || $1 == "h" || $1 == "help" ]]; then
 	print_help
 elif [[ $1 == "u" || $1 == "up" || $1 == "-u" || $1 == "--up" ]]; then
-	restore	
+	restore	saved
+elif [[ $1 == "r" || $1 == "restore" || $1 == "-r" || $1 == "--restore" || $1 == "rollback" ]]; then
+	if [[ $2 == "" || $2 == " " || $2 == "saved" ]]; then
+		restore saved
+	elif [[ $2 == "previous" || $2 == "p" || $1 == "rollback" ]]; then
+		restore previous
+    fi
 elif [[ $1 == "d" || $1 == "down" || $1 == "-d" || $1 == "--down" ]]; then
 	save
 	flush
@@ -116,6 +433,26 @@ elif [[ $1 == "l" || $1 == "list" || $1 == "-l" || $1 == "--list" ]]; then
 	list
 elif [[ $1 == "me" || $1 == "--me" || $1 == "letmein" || $1 == "--letmein" ]]; then
 	giveMeAccess $2
+elif [[ $1 == "lockdown" ]]; then
+    if [[ $2 != "" && $2 != " " ]]; then
+        lockdown $2
+    else
+        lockdown
+    fi
+elif [[ $1 == "log" ]]; then
+	if [[ $2 == '' || $2 == ' ' || $2 == 'a' || $2 == 'append' || $2 == 'l' || $2 == 'last' ]]; then
+		log_it last
+	elif [[ $2 == 'i' || $2 == 'insert' || $2 == 'f' || $2 == 'first' ]]; then
+		log_it first
+	fi
+elif [[ $1 == "show" && $2 == "logs" ]]; then
+	if [[ $3 == '' || $3 == ' ' || $3 == 'all' ]]; then
+		show_logs all
+	elif [[ $3 == 'unique' ]]; then
+		show_logs unique
+	fi
+elif [[ $1 == "closeports" ]]; then
+	echo "close ports function not implemented"
 elif [[ $1 != "" && $1 != " " && $2 != "" && $2 != " " ]]; then
 	if [[ $1 =~ [0-9][0-9][0-9]?.[0-9][0-9]?[0-9]?.[0-9][0-9]?[0-9]?.[0-9][0-9]?[0-9]? ]]; then #[regex for full ipv4 address]
 		if [[ $2 == "b" || $2 == "-b" || $2 == "block" || $2 == "--block" ]]; then
@@ -151,199 +488,35 @@ elif [[ $1 != "" && $1 != " " && $2 != "" && $2 != " " ]]; then
 #			echo "Allowance of entire subnets must be done manually"
 #		fi
 #		sudo iptables-save > /tmp/house6rules
+
 	elif [[ $1 == "ssh" || $1 == "--ssh" ]]; then
-		port=22
-		if [[ $2 == "a" || $2 == "allow" ]]; then
-			sudo iptables -A INPUT -p tcp --dport $port -j ACCEPT
-			sudo iptables -A OUTPUT -p tcp --sport $port -j ACCEPT
-			sudo ip6tables -A INPUT -p tcp --dport $port -j ACCEPT
-			sudo ip6tables -A OUTPUT -p tcp --sport $port -j ACCEPT
-			echo "All $1 traffic on port $port allowed"
-		elif [[ $2 == "b" || $2 == "block" ]]; then
-			sudo iptables -I INPUT -p tcp --dport $port -j DROP
-			sudo iptables -I OUTPUT -p tcp --sport $port -j DROP
-			sudo ip6tables -I INPUT -p tcp --dport $port -j DROP
-			sudo ip6tables -I OUTPUT -p tcp --sport $port -j DROP
-			echo "All $1 traffic on port $port blocked"
-		elif [[ $2 == "" || $2 == " " ]]; then
-			echo "No decision specified for $1! <allow|block>"
-		fi
+	    config_ssh $2
 	elif [[ $1 == "rsync" || $1 == "--rsync" ]]; then
-		port=873
-		if [[ $2 == "a" || $2 == "allow" ]]; then
-			sudo iptables -A INPUT -p tcp --dport $port -j ACCEPT
-			sudo iptables -A OUTPUT -p tcp --sport $port -j ACCEPT
-			sudo ip6tables -A INPUT -p tcp --dport $port -j ACCEPT
-			sudo ip6tables -A OUTPUT -p tcp --sport $port -j ACCEPT
-			echo "All $1 traffic on port $port allowed"
-		elif [[ $2 == "b" || $2 == "block" ]]; then
-			sudo iptables -I INPUT -p tcp --dport $port -j DROP
-			sudo iptables -I OUTPUT -p tcp --sport $port -j DROP
-			sudo ip6tables -I INPUT -p tcp --dport $port -j DROP
-			sudo ip6tables -I OUTPUT -p tcp --sport $port -j DROP
-			echo "All $1 traffic on port $port blocked"
-		elif [[ $2 == "" || $2 == " " ]]; then
-			echo "No decision specified for $1! <allow|block>"
-		fi
+		config_rsync $2
 	elif [[ $1 == "http" || $1 == "--http" ]]; then
-		port=80
-		if [[ $2 == "a" || $2 == "allow" ]]; then
-			sudo iptables -A INPUT -p tcp --dport $port -j ACCEPT
-			sudo iptables -A OUTPUT -p tcp --sport $port -j ACCEPT
-			sudo ip6tables -A INPUT -p tcp --dport $port -j ACCEPT
-			sudo ip6tables -A OUTPUT -p tcp --sport $port -j ACCEPT
-			echo "All $1 traffic on port $port allowed"
-		elif [[ $2 == "b" || $2 == "block" ]]; then
-			sudo iptables -I INPUT -p tcp --dport $port -j DROP
-			sudo iptables -I OUTPUT -p tcp --sport $port -j DROP
-			sudo ip6tables -I INPUT -p tcp --dport $port -j DROP
-			sudo ip6tables -I OUTPUT -p tcp --sport $port -j DROP
-			echo "All $1 traffic on port $port blocked"
-		elif [[ $2 == "" || $2 == " " ]]; then
-			echo "No decision specified for $1! <allow|block>"
-		fi
+		config_http $2
 	elif [[ $1 == "https" || $1 == "--https" ]]; then
-		port=443
-        if [[ $2 == "a" || $2 == "allow" ]]; then
-			sudo iptables -A INPUT -p tcp --dport $port -j ACCEPT
-			sudo iptables -A OUTPUT -p tcp --sport $port -j ACCEPT
-			sudo ip6tables -A INPUT -p tcp --dport $port -j ACCEPT
-			sudo ip6tables -A OUTPUT -p tcp --sport $port -j ACCEPT
-			echo "All $1 traffic on port $port allowed"
-		elif [[ $2 == "b" || $2 == "block" ]]; then
-			sudo iptables -I INPUT -p tcp --dport $port -j DROP
-			sudo iptables -I OUTPUT -p tcp --sport $port -j DROP
-			sudo ip6tables -I INPUT -p tcp --dport $port -j DROP
-			sudo ip6tables -I OUTPUT -p tcp --sport $port -j DROP
-			echo "All $1 traffic on port $port blocked"
-		elif [[ $2 == "" || $2 == " " ]]; then
-			echo "No decision specified for $1! <allow|block>"
-		fi
-	elif [[ $1 == "mysql" || $1 == "--mysql" ]]; then
-		port=3306
-        if [[ $2 == "a" || $2 == "allow" ]]; then
-			sudo iptables -A INPUT -p tcp --dport $port -j ACCEPT
-			sudo iptables -A OUTPUT -p tcp --sport $port -j ACCEPT
-			sudo ip6tables -A INPUT -p tcp --dport $port -j ACCEPT
-			sudo ip6tables -A OUTPUT -p tcp --sport $port -j ACCEPT
-			echo "All $1 traffic on port $port allowed"
-		elif [[ $2 == "b" || $2 == "block" ]]; then
-			sudo iptables -I INPUT -p tcp --dport $port -j DROP
-			sudo iptables -I OUTPUT -p tcp --sport $port -j DROP
-			sudo ip6tables -I INPUT -p tcp --dport $port -j DROP
-			sudo ip6tables -I OUTPUT -p tcp --sport $port -j DROP
-			echo "All $1 traffic on port $port blocked"
-		elif [[ $2 == "" || $2 == " " ]]; then
-			echo "No decision specified for $1! <allow|block>"
-		fi
-	elif [[ $1 == "postresql" || $1 == "--postgresql" ]]; then
-		port=5432
-        if [[ $2 == "a" || $2 == "allow" ]]; then
-			sudo iptables -A INPUT -p tcp --dport $port -j ACCEPT
-			sudo iptables -A OUTPUT -p tcp --sport $port -j ACCEPT
-			sudo ip6tables -A INPUT -p tcp --dport $port -j ACCEPT
-			sudo ip6tables -A OUTPUT -p tcp --sport $port -j ACCEPT
-			echo "All $1 traffic on port $port allowed"
-		elif [[ $2 == "b" || $2 == "block" ]]; then
-			sudo iptables -I INPUT -p tcp --dport $port -j DROP
-			sudo iptables -I OUTPUT -p tcp --sport $port -j DROP
-			sudo ip6tables -I INPUT -p tcp --dport $port -j DROP
-			sudo ip6tables -I OUTPUT -p tcp --sport $port -j DROP
-			echo "All $1 traffic on port $port blocked"
-		elif [[ $2 == "" || $2 == " " ]]; then
-			echo "No decision specified for $1! <allow|block>"
-		fi
+        config_https $2
+    elif [[ $1 == "mysql" || $1 == "--mysql" ]]; then
+        config_mysql $2
+	elif [[ $1 == "postresql" || $1 == "--postgresql" || $1 == "postgre" || $1 == "--postgre" ]]; then
+        config_postgresql $2
 	elif [[ $1 == "smtp" || $1 == "--smtp" ]]; then
-        port=25
-		if [[ $2 == "a" || $2 == "allow" ]]; then
-			sudo iptables -A INPUT -p tcp --dport $port -j ACCEPT
-			sudo iptables -A OUTPUT -p tcp --sport $port -j ACCEPT
-			sudo ip6tables -A INPUT -p tcp --dport $port -j ACCEPT
-			sudo ip6tables -A OUTPUT -p tcp --sport $port -j ACCEPT
-			echo "All $1 traffic on port $port allowed"
-		elif [[ $2 == "b" || $2 == "block" ]]; then
-			sudo iptables -I INPUT -p tcp --dport $port -j DROP
-			sudo iptables -I OUTPUT -p tcp --sport $port -j DROP
-			sudo ip6tables -I INPUT -p tcp --dport $port -j DROP
-			sudo ip6tables -I OUTPUT -p tcp --sport $port -j DROP
-			echo "All $1 traffic on port $port blocked"
-		elif [[ $2 == "" || $2 == " " ]]; then
-			echo "No decision specified for $1! <allow|block>"
-		fi
-	elif [[ $1 == "imap" || $1 == "--imap" ]]; then
-		port=143
-        if [[ $2 == "a" || $2 == "allow" ]]; then
-			sudo iptables -A INPUT -p tcp --dport $port -j ACCEPT
-			sudo iptables -A OUTPUT -p tcp --sport $port -j ACCEPT
-			sudo ip6tables -A INPUT -p tcp --dport $port -j ACCEPT
-			sudo ip6tables -A OUTPUT -p tcp --sport $port -j ACCEPT
-			echo "All $1 traffic on port $port allowed"
-		elif [[ $2 == "b" || $2 == "block" ]]; then
-			sudo iptables -I INPUT -p tcp --dport $port -j DROP
-			sudo iptables -I OUTPUT -p tcp --sport $port -j DROP
-			sudo ip6tables -I INPUT -p tcp --dport $port -j DROP
-			sudo ip6tables -I OUTPUT -p tcp --sport $port -j DROP
-			echo "All $1 traffic on port $port blocked"
-		elif [[ $2 == "" || $2 == " " ]]; then
-			echo "No decision specified for $1! <allow|block>"
-		fi
+        config_smtp $2
+    elif [[ $1 == "imap" || $1 == "--imap" ]]; then
+        config_imap $2
 	elif [[ $1 == "imaps" || $1 == "--imaps" ]]; then
-		port=993
-        if [[ $2 == "a" || $2 == "allow" ]]; then
-			sudo iptables -A INPUT -p tcp --dport $port -j ACCEPT
-			sudo iptables -A OUTPUT -p tcp --sport $port -j ACCEPT
-			sudo ip6tables -A INPUT -p tcp --dport $port -j ACCEPT
-			sudo ip6tables -A OUTPUT -p tcp --sport $port -j ACCEPT
-			echo "All $1 traffic on port $port allowed"
-		elif [[ $2 == "b" || $2 == "block" ]]; then
-			sudo iptables -I INPUT -p tcp --dport $port -j DROP
-			sudo iptables -I OUTPUT -p tcp --sport $port -j DROP
-			sudo ip6tables -I INPUT -p tcp --dport $port -j DROP
-			sudo ip6tables -I OUTPUT -p tcp --sport $port -j DROP
-			echo "All $1 traffic on port $port blocked"
-		elif [[ $2 == "" || $2 == " " ]]; then
-			echo "No decision specified for $1! <allow|block>"
-		fi
+        config_imaps $2
 	elif [[ $1 == "pop3" || $1 == "--pop3" ]]; then
-		port=110
-        if [[ $2 == "a" || $2 == "allow" ]]; then
-			sudo iptables -A INPUT -p tcp --dport $port -j ACCEPT
-			sudo iptables -A OUTPUT -p tcp --sport $port -j ACCEPT
-			sudo ip6tables -A INPUT -p tcp --dport $port -j ACCEPT
-			sudo ip6tables -A OUTPUT -p tcp --sport $port -j ACCEPT
-			echo "All $1 traffic on port $port allowed"
-		elif [[ $2 == "b" || $2 == "block" ]]; then
-			sudo iptables -I INPUT -p tcp --dport $port -j DROP
-			sudo iptables -I OUTPUT -p tcp --sport $port -j DROP
-			sudo ip6tables -I INPUT -p tcp --dport $port -j DROP
-			sudo ip6tables -I OUTPUT -p tcp --sport $port -j DROP
-			echo "All $1 traffic on port $port blocked"
-		elif [[ $2 == "" || $2 == " " ]]; then
-			echo "No decision specified for $1! <allow|block>"
-		fi
+        config_pop3 $2
 	elif [[ $1 == "pop3s" || $1 == "--pop3s" ]]; then
-		port=995
-        if [[ $2 == "a" || $2 == "allow" ]]; then
-			sudo iptables -A INPUT -p tcp --dport $port -j ACCEPT
-			sudo iptables -A OUTPUT -p tcp --sport $port -j ACCEPT
-			sudo ip6tables -A INPUT -p tcp --dport $port -j ACCEPT
-			sudo ip6tables -A OUTPUT -p tcp --sport $port -j ACCEPT
-			echo "All $1 traffic on port $port allowed"
-		elif [[ $2 == "b" || $2 == "block" ]]; then
-			sudo iptables -I INPUT -p tcp --dport $port -j DROP
-			sudo iptables -I OUTPUT -p tcp --sport $port -j DROP
-			sudo ip6tables -I INPUT -p tcp --dport $port -j DROP
-			sudo ip6tables -I OUTPUT -p tcp --sport $port -j DROP
-			echo "All $1 traffic on port $port blocked"
-		elif [[ $2 == "" || $2 == " " ]]; then
-			echo "No decision specified for $1! <allow|block>"
-		fi
-	fi
-	save
+        config_pop3s $2
+    fi
+    save
 elif [[ $1 == "" || $1 == " " ]]; then
-	echo "No ip information entered!"
-	print_help
+    echo "No ip information entered!"
+    print_help
 elif [[ $2 == "" || $2 == " " ]]; then
-	echo "No routing decision entered! <block or allow>"
-	print_help
+    echo "No routing decision entered! <block or allow>"
+    print_help
 fi

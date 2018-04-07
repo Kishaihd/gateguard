@@ -1,0 +1,13 @@
+#compdef gateguard
+local -a subcmds
+subcmds=(
+'help:show help and usage commands' 
+'up:restore iptables rules from previous configuration' 
+'down:take down iptables rules, saving current configuration' 
+'flush:flush iptables rules without saving current configuration' 
+'remove:remove saved rules without dropping current configurations' 
+'list:list current iptables rules' 
+'log:log all packets' 
+)
+_describe 'command' subcmds
+#_arguments '-h[show help menu]' '--list[list some shit]'
